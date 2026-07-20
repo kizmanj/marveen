@@ -1,0 +1,26 @@
+services:
+  marveen:
+    build: .
+    container_name: marveen
+    restart: unless-stopped
+    ports:
+      #- "${WEB_PORT:-3420}:${WEB_PORT:-3420}"
+      - 3421:3420
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ALLOWED_CHAT_ID=${ALLOWED_CHAT_ID}
+      - OWNER_NAME=${OWNER_NAME}
+      #- WEB_HOST=0.0.0.0
+      #- WEB_PORT=${WEB_PORT:-3420}
+      - MARVEEN_ENV=linux-server
+    volumes:
+      - .env:/app/.env
+      # Persistent data
+      #- /mnt/user/appdata/marveen/store:/app/store
+      - /Users/kizmanj/Work/marveen/store:/app/store
+      # Claude config (skills, channels, settings, scheduled tasks)
+      #- /mnt/user/appdata/marveen/claude-home:/home/node/.claude
+      - /Users/kizmanj/.claude:/home/node/.claude
+    stdin_open: true
+    tty: true
