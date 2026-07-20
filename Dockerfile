@@ -12,10 +12,12 @@ RUN apt-get update && apt-get install -y \
     gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# Claude Code CLI (as root, before user switch)
+# Bun (telegram plugin runtime) + Claude Code CLI
+RUN curl -fsSL https://bun.sh/install | bash \
+    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
 RUN npm install -g @anthropic-ai/claude-code
 #RUN git clone https://github.com/Szotasz/marveen.git /app
-RUN git clone https://github.com/kizmanj/marveen.git /app
+RUN git clone --branch docker_build --single-branch https://github.com/kizmanj/marveen.git /app
 
 # Non-root user: reuse the existing 'node' user (uid 1000) from node:20-slim
 RUN mkdir -p /home/node/.claude /app/store \
