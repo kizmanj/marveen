@@ -877,10 +877,19 @@ export function mainChannelsSessionExists(): boolean {
 // is booting -- benign) and 'script-missing'/'spawn-failed' (the install is
 // broken) must NOT look alike to callers. The onboarding launch endpoint
 // reports the former as "starting" and the latter as a hard error; a boolean
-// collapsed both into a silent false success (PR #779 review).
-export type MainSessionCreateResult = 'started' | 'grace' | 'script-missing' | 'spawn-failed'
+// collapsed both into a silent false success (PR #779 review). 'supervised'
+// is a benign skip: an external supervisor owns the restart, so callers treat
+// it like the other non-error states (starting), never as a broken install.
+export type MainSessionCreateResult = 'started' | 'grace' | 'supervised' | 'script-missing' | 'spawn-failed'
 
 export function createMainChannelsSession(): MainSessionCreateResult {
+  // When an external supervisor (Docker entrypoint loop, systemd KeepAlive) is
+  // responsible for restarting channels.sh, skip the in-process spawn entirely.
+  // Two concurrent channels.sh instances would race on the same tmux session.
+  if (process.env.MARVEEN_CHANNELS_SUPERVISED === '1') {
+    logger.debug('createMainChannelsSession: skipped (MARVEEN_CHANNELS_SUPERVISED=1, external supervisor handles restart)')
+    return 'supervised'
+  }
   const now = Date.now()
   if (marveenLastSessionCreate && now - marveenLastSessionCreate < MAIN_SESSION_CREATE_GRACE_MS) {
     return 'grace'
@@ -1339,7 +1348,7 @@ async function handleMarveenDown(): Promise<void> {
     marveenDownState.stageStartedAt = now
     marveenDownState.lastAlertAt = now
     logger.warn({ provider: providerLabel }, 'Marveen channel plugin still down -- stage 4 (hard restart)')
-    const svcName = process.platform === 'linux' ? 'systemctl' : 'launchctl'
+    const svcName = process.env.MARVEEN_CHANNELS_SUPERVISED === '1' ? 'respawn-pane' : process.platform === 'linux' ? 'systemctl' : 'launchctl'
     sendAlert(`⚠️ Session resume nem segitett. Hard restart (${svcName}) most a ${MAIN_CHANNELS_SESSION} session-on...`)
     hardRestartMarveenChannels()
     return
@@ -1348,9 +1357,11 @@ async function handleMarveenDown(): Promise<void> {
     marveenDownState.stage = 'gave_up'
     marveenDownState.lastAlertAt = now
     logger.error({ provider: providerLabel }, 'Marveen channel plugin still down after hard restart -- giving up auto-recovery')
-    const serviceCmd = process.platform === 'linux'
-      ? `\`systemctl --user status ${SERVICE_ID}-channels\``
-      : `\`launchctl list | grep ${SERVICE_ID}\``
+    const serviceCmd = process.env.MARVEEN_CHANNELS_SUPERVISED === '1'
+      ? `\`docker logs <container>\``
+      : process.platform === 'linux'
+        ? `\`systemctl --user status ${SERVICE_ID}-channels\``
+        : `\`launchctl list | grep ${SERVICE_ID}\``
     // Issue #189: a plain `tmux attach -t ...` may itself fail with "Permission
     // denied" when the operator is running it from another tmux session. Prefix
     // with `unset TMUX` so the hint works in both nested and non-nested cases.
