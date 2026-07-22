@@ -47,6 +47,16 @@ ENV MARVEEN_CHANNELS_SUPERVISED=1
 # Build as node user
 RUN gosu node npm ci --production=false && gosu node npm run build
 
+# Pre-build telegram plugin with Linux-native bun dependencies.
+# Installed into /opt/claude-plugins so a ~/.claude volume mount cannot shadow it.
+# The entrypoint copies it into the live plugin cache on every boot.
+RUN export HOME=/tmp/plugintmp && mkdir -p "$HOME" && \
+    claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true && \
+    claude plugin install telegram@claude-plugins-official --dangerously-skip-permissions 2>/dev/null || true && \
+    mkdir -p /opt/claude-plugins && \
+    { cp -r "$HOME/.claude/plugins" /opt/claude-plugins/ 2>/dev/null && echo "[docker] Plugin cache mentve: /opt/claude-plugins/"; } || \
+      echo "[docker] WARN: Plugin install sikertelen a build során."
+
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 

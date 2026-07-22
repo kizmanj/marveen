@@ -31,6 +31,15 @@ fi
 #   2. bun binary: /Users/.../.bun/bin/bun does not exist here -> ENOENT
 # Install from marketplace first (no-op if already present), then patch the JSON.
 claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
+# If the image ships a pre-built Linux-native plugin cache (/opt/claude-plugins/),
+# copy it into the live location. This overwrites any macOS volume-mounted cache
+# so the plugin always runs with correct Linux binaries and bun paths.
+if [ -d /opt/claude-plugins/plugins ]; then
+    mkdir -p "${HOME}/.claude"
+    cp -r /opt/claude-plugins/plugins "${HOME}/.claude/"
+    echo "[marveen] Linux-natív plugin cache másolva: ${HOME}/.claude/plugins"
+fi
+# Patch any remaining host paths in installed_plugins.json (fallback: no /opt cache).
 PLUGIN_JSON="${HOME}/.claude/plugins/installed_plugins.json"
 if [ -f "$PLUGIN_JSON" ]; then
     BUN_BIN="$(command -v bun 2>/dev/null || echo /usr/local/bin/bun)"
