@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y \
 # Bun (telegram plugin runtime) + Claude Code CLI
 RUN curl -fsSL https://bun.sh/install | bash \
     && ln -s /root/.bun/bin/bun /usr/local/bin/bun
-RUN npm install -g @anthropic-ai/claude-code
+RUN npm install -g @anthropic-ai/claude-code \
+    && node /usr/local/lib/node_modules/@anthropic-ai/claude-code/install.cjs
 #RUN git clone https://github.com/Szotasz/marveen.git /app
 RUN git clone --branch docker_build --single-branch https://github.com/kizmanj/marveen.git /app
 
