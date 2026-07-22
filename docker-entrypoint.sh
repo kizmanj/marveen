@@ -25,22 +25,14 @@ elif [ -f /app/.env.example ]; then
     env > /app/.env
 fi
 
-# Install telegram plugin if missing (fresh deploy or empty ~/.claude mount)
-PLUGIN_CACHE="${HOME}/.claude/plugins/cache/claude-plugins-official/telegram"
-if [ ! -d "$PLUGIN_CACHE" ]; then
-    echo "[marveen] Telegram plugin telepítése..."
-    claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
-    claude plugin install telegram@claude-plugins-official --dangerously-skip-permissions 2>/dev/null && \
-        echo "[marveen] Telegram plugin telepítve." || \
-        echo "[marveen] WARN: Telegram plugin telepítés sikertelen."
-fi
-
-# Fix plugin installPath: replace host absolute paths with container paths
-PLUGIN_JSON="${HOME}/.claude/plugins/installed_plugins.json"
-if [ -f "$PLUGIN_JSON" ]; then
-    sed -i "s|/[^\"']*/\.claude/plugins|${HOME}/.claude/plugins|g" "$PLUGIN_JSON"
-    echo "[marveen] Plugin útvonalak javítva."
-fi
+# Always reinstall telegram plugin so the container's own bun path is registered.
+# If ~/.claude is volume-mounted from macOS, installed_plugins.json stores macOS
+# bun paths (/Users/.../.bun/bin/bun) that don't exist here -> ENOENT on connect.
+echo "[marveen] Telegram plugin telepítése..."
+claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
+claude plugin install telegram@claude-plugins-official --dangerously-skip-permissions 2>/dev/null && \
+    echo "[marveen] Telegram plugin telepítve." || \
+    echo "[marveen] WARN: Telegram plugin telepítés sikertelen."
 
 # Start tmux server first (channels.sh and backend both need it)
 echo "[marveen] tmux szerver indítása..."
