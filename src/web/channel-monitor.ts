@@ -5,7 +5,7 @@ import { execFileSync, spawn } from 'node:child_process'
 import { resolveFromPath } from '../platform.js'
 import { WEB_PORT } from '../config.js'
 import { logger } from '../logger.js'
-import { MAIN_AGENT_ID, SERVICE_ID, BOT_NAME, CHANNEL_PROVIDER, PROJECT_ROOT, RESPAWN_ENABLED } from '../config.js'
+import { MAIN_AGENT_ID, SERVICE_ID, BOT_NAME, CHANNEL_PROVIDER, PROJECT_ROOT, STORE_DIR, RESPAWN_ENABLED } from '../config.js'
 import { agentDir, listAgentNames, readAgentChannelProvider } from './agent-config.js'
 import {
   agentHasChannel,
@@ -723,7 +723,7 @@ export async function resumeMarveenSession(): Promise<boolean> {
       isolatedConfigDir: ensureMainAgentIsolatedConfigDir(),
       fleetToken: hasFleetOauthToken(),
     })
-    execFileSync(TMUX, ['respawn-pane', '-k', '-t', MAIN_CHANNELS_SESSION, claudeCmd], { timeout: 15000 })
+    execFileSync(TMUX, ['respawn-pane', '-k', '-c', STORE_DIR, '-t', MAIN_CHANNELS_SESSION, claudeCmd], { timeout: 15000 })
 
     // --continue replays the last conversation. When the prior session is large
     // (>200k tokens) Claude Code opens with a "Resume from summary" modal that
@@ -944,7 +944,7 @@ function respawnMarveenSessionFresh(): boolean {
       isolatedConfigDir: ensureMainAgentIsolatedConfigDir(),
       fleetToken: hasFleetOauthToken(),
     })
-    execFileSync(TMUX, ['respawn-pane', '-k', '-t', MAIN_CHANNELS_SESSION, claudeCmd], { timeout: 15000 })
+    execFileSync(TMUX, ['respawn-pane', '-k', '-c', STORE_DIR, '-t', MAIN_CHANNELS_SESSION, claudeCmd], { timeout: 15000 })
     logger.warn({ provider: provider.type }, 'Hard restart: marveen session respawned fresh (no --continue)')
     // Re-establish /name on the fresh process (see note in resumeMarveenSession).
     // scheduleIdentitySetup only schedules delayed timers -> fire-and-forget.
