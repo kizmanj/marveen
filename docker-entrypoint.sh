@@ -25,14 +25,19 @@ elif [ -f /app/.env.example ]; then
     env > /app/.env
 fi
 
-# Always reinstall telegram plugin so the container's own bun path is registered.
-# If ~/.claude is volume-mounted from macOS, installed_plugins.json stores macOS
-# bun paths (/Users/.../.bun/bin/bun) that don't exist here -> ENOENT on connect.
-echo "[marveen] Telegram plugin telepítése..."
+# Fix plugin paths in installed_plugins.json.
+# When ~/.claude is volume-mounted from macOS, two paths break in the container:
+#   1. installPath: host absolute path vs /home/node/.claude/...
+#   2. bun binary: /Users/.../.bun/bin/bun does not exist here -> ENOENT
+# Install from marketplace first (no-op if already present), then patch the JSON.
 claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
-claude plugin install telegram@claude-plugins-official --dangerously-skip-permissions 2>/dev/null && \
-    echo "[marveen] Telegram plugin telepítve." || \
-    echo "[marveen] WARN: Telegram plugin telepítés sikertelen."
+PLUGIN_JSON="${HOME}/.claude/plugins/installed_plugins.json"
+if [ -f "$PLUGIN_JSON" ]; then
+    BUN_BIN="$(command -v bun 2>/dev/null || echo /usr/local/bin/bun)"
+    sed -i "s|/[^\"]*/\.claude/plugins|${HOME}/.claude/plugins|g" "$PLUGIN_JSON"
+    sed -i "s|/[^\"]*\.bun[^\"]*bin/bun|${BUN_BIN}|g" "$PLUGIN_JSON"
+    echo "[marveen] Plugin útvonalak javítva (cache + bun: ${BUN_BIN})."
+fi
 
 # Start tmux server first (channels.sh and backend both need it)
 echo "[marveen] tmux szerver indítása..."
