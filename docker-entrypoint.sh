@@ -48,6 +48,10 @@ export MCP_SERVER_CONNECTION_BATCH_SIZE=10
 export MCP_CONNECTION_NONBLOCKING=1
 export MCP_TIMEOUT=60000
 tmux start-server
+# Keep the tmux server alive even when channels.sh session exits between restarts.
+# Without this, tmux exits when there are no sessions and the backend gets
+# "no server running" on every probe until channels.sh comes back up.
+tmux new-session -d -s marveen-anchor 2>/dev/null || true
 
 # Start backend in background
 echo "[marveen] Backend indítása..."
