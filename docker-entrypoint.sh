@@ -17,36 +17,32 @@ fi
 mkdir -p /app/store
 
 # Load .env if present (make vars available to this script)
-if [ -f /app/.env ]; then
-    set -o allexport
-    source /app/.env
-    set +o allexport
-elif [ -f /app/.env.example ]; then
-    env > /app/.env
-fi
+# if [ -f /app/.env ]; then
+#     set -o allexport
+#     source /app/.env
+#     set +o allexport
+# elif [ -f /app/.env.example ]; then
+#     env > /app/.env
+# fi
+env > /app/.env
+env > /app/store/.env
 
 # Fix plugin paths in installed_plugins.json.
 # When ~/.claude is volume-mounted from macOS, two paths break in the container:
 #   1. installPath: host absolute path vs /home/node/.claude/...
 #   2. bun binary: /Users/.../.bun/bin/bun does not exist here -> ENOENT
 # Install from marketplace first (no-op if already present), then patch the JSON.
+rm -rf ~/.claude/plugins
+claude plugin marketplace remove claude-plugins-official 2>/dev/null || true
+claude plugin marketplace remove marveen-marketplace 2>/dev/null || true
 claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
-# If the image ships a pre-built Linux-native plugin cache (/opt/claude-plugins/),
-# copy it into the live location. This overwrites any macOS volume-mounted cache
-# so the plugin always runs with correct Linux binaries and bun paths.
-if [ -d /opt/claude-plugins/plugins ]; then
-    mkdir -p "${HOME}/.claude"
-    cp -r /opt/claude-plugins/plugins "${HOME}/.claude/"
-    echo "[marveen] Linux-natív plugin cache másolva: ${HOME}/.claude/plugins"
-fi
-# Patch any remaining host paths in installed_plugins.json (fallback: no /opt cache).
-PLUGIN_JSON="${HOME}/.claude/plugins/installed_plugins.json"
-if [ -f "$PLUGIN_JSON" ]; then
-    BUN_BIN="$(command -v bun 2>/dev/null || echo /usr/local/bin/bun)"
-    sed -i "s|/[^\"]*/\.claude/plugins|${HOME}/.claude/plugins|g" "$PLUGIN_JSON"
-    sed -i "s|/[^\"]*\.bun[^\"]*bin/bun|${BUN_BIN}|g" "$PLUGIN_JSON"
-    echo "[marveen] Plugin útvonalak javítva (cache + bun: ${BUN_BIN})."
-fi
+claude plugin install telegram@claude-plugins-official 2>/dev/null || true
+claude plugin marketplace add Szotasz/marveen-marketplace 2>/dev/null || true
+claude plugin install slack-channel@marveen-marketplace 2>/dev/null || true
+#CLAUDE_CONFIG_DIR=/app/store/.claude 
+
+mkdir -p ~/.claude/channels/telegram
+echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" > ~/.claude/channels/telegram/.env 
 
 # Start tmux server first (channels.sh and backend both need it)
 echo "[marveen] tmux szerver indítása..."

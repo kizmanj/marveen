@@ -11,11 +11,14 @@ RUN apt-get update && apt-get install -y \
     bash \
     gosu \
     unzip \
+    ffmpeg \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 # Bun (telegram plugin runtime) + Claude Code CLI
 RUN curl -fsSL https://bun.sh/install | bash \
-    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
+    && cp /root/.bun/bin/bun /usr/local/bin/bun \
+    && chmod 755 /usr/local/bin/bun
 RUN npm install -g @anthropic-ai/claude-code \
     && node /usr/local/lib/node_modules/@anthropic-ai/claude-code/install.cjs
 #RUN git clone https://github.com/Szotasz/marveen.git /app
@@ -40,22 +43,26 @@ RUN mkdir -p /home/node/.claude /app/store \
 
 WORKDIR /app
 
+# Build as node user
+RUN gosu node npm ci --production=false && gosu node npm run build
+
 # Signal to channel-monitor that an external supervisor (entrypoint loop) manages
 # channels.sh restarts -- prevents in-process spawn from racing the loop.
 ENV MARVEEN_CHANNELS_SUPERVISED=1
+ENV MAIN_AGENT_ISOLATED_CONFIG=1
+ENV MAIN_AGENT_CONFIG_DIR=/app/store/.claude
 
-# Build as node user
-RUN gosu node npm ci --production=false && gosu node npm run build
+RUN gosu node scripts/install-voice.sh
 
 # Pre-build telegram plugin with Linux-native bun dependencies.
 # Installed into /opt/claude-plugins so a ~/.claude volume mount cannot shadow it.
 # The entrypoint copies it into the live plugin cache on every boot.
-RUN export HOME=/tmp/plugintmp && mkdir -p "$HOME" && \
-    claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true && \
-    claude plugin install telegram@claude-plugins-official --dangerously-skip-permissions 2>/dev/null || true && \
-    mkdir -p /opt/claude-plugins && \
-    { cp -r "$HOME/.claude/plugins" /opt/claude-plugins/ 2>/dev/null && echo "[docker] Plugin cache mentve: /opt/claude-plugins/"; } || \
-      echo "[docker] WARN: Plugin install sikertelen a build során."
+# RUN export HOME=/tmp/plugintmp && mkdir -p "$HOME" && \
+#     claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true && \
+#     claude plugin install telegram@claude-plugins-official --dangerously-skip-permissions 2>/dev/null || true && \
+#     mkdir -p /opt/claude-plugins && \
+#     { cp -r "$HOME/.claude/plugins" /opt/claude-plugins/ 2>/dev/null && echo "[docker] Plugin cache mentve: /opt/claude-plugins/"; } || \
+#       echo "[docker] WARN: Plugin install sikertelen a build során."
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
